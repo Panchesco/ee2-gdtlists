@@ -151,7 +151,7 @@
 				  
 				  foreach($items as $row)
 				  {
-					  $data['item'][] = array('item'=>$row);
+					  $data['item'][] = array('item'=>htmlentities($row));
 				  }
 				  
 				  return ee()->TMPL->parse_variables(ee()->TMPL->tagdata,$data['item']);
@@ -189,7 +189,7 @@
 				   	{
 					   	foreach($query->result() as $row)
 					   	{
-						   	$data['item'][] = array('item'=>$row->{$col});	
+						   	$data['item'][] = array('item'=>htmlentities($row->{$col}));	
 						}
 				   	
 				   	} else {
@@ -197,6 +197,8 @@
 						$data['item'][] = array('item'=>'');   	
 				   	
 				   	}
+				   	
+				   	
 
 				   	return ee()->TMPL->parse_variables(ee()->TMPL->tagdata,$data['item']);
 			   }	
@@ -259,21 +261,18 @@
 					 
 					SINGLE TAGS:
 					----------------------------------------------------------------------------
-					{exp:gdtlists:items field_name="custom_field_name"} - Returns custom field 
-					list items as a string.
+					{exp:gdtlists:items field_name="custom_field_name"} - Returns custom field list items as a string.
 					
 					TAG PAIRS:
 					----------------------------------------------------------------------------
-					{exp:gdtlists:items_array field_name="custom_field_name"} - Returns list items 
-					one-by-one using the {item} variable.
+					{exp:gdtlists:items_array field_name="custom_field_name"} - Returns a list items one-by-one using the {item} variable.
 					
 					Example: 
 					{exp:gdtlists:items_array field_name="custom_field_name"}
 						{item}
 					{/exp:gdtlists:items_array}
 					
-					{exp:gdtlists:items_grouped field_name="custom_field_name" sort="desc"} - Returns
-					a list of distinct items from the the data for a custom field.
+					{exp:gdtlists:items_grouped field_name="custom_field_name" sort="desc"} - Returns a list distinct items from the the data for a custom field.
 					
 					Example:
 					{exp:gdtlists:items_array field_name="awardee_years" sort="desc" channel_name="awardee-database"}
@@ -283,7 +282,7 @@
 					
 					VARIABLES: 
 					----------------------------------------------------------------------------
-					{item}	- List item value in tag pairs
+					{item}			- List item value in tag pairs
 					
 					
 					REQUIRED PARAMETERS: 
