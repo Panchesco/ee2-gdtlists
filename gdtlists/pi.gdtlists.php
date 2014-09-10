@@ -67,6 +67,7 @@
 			public	$items_array		= array();
 			public	$line_break			= "<br />\n";
 			public	$sort				= 'ASC';
+			public	$custom_fields		= array();
 			
 		
 			public function __construct()
@@ -87,6 +88,9 @@
 				{
 				    $this->field_name	= ee()->TMPL->fetch_param('field_name');
 				    $this->set_field_list_items();
+				    
+				    
+				    
 				}
 				
 				if(ee()->TMPL->fetch_param('line_break'))
@@ -103,6 +107,10 @@
 						$this->sort = 'ASC';
 					}
 				}
+				
+				
+				
+				
 			}
 			
 			// ------------------------------------------------------------------------
@@ -167,9 +175,21 @@
 			   */
 			   public function items_grouped()
 			   {
-				  	$data['item']		= array();
+				  	$this->set_field_group_data();
+				    $this->set_custom_fields();
+				    
+					$data['item']		= array();
 				  	$col 				= $this->field_id();
 				  	$where[$col." !="]	= '';	
+				  	
+				  	
+				  	foreach($this->custom_fields as $key => $row)
+				  	{
+					  	if(ee()->TMPL->fetch_param($key))
+					  	{
+						  	$where[$row]	= ee()->TMPL->fetch_param($key);
+					  	}
+				  	}
 				  	
 				  	if($this->channel_id !== FALSE)
 				  	{
@@ -248,6 +268,63 @@
 					     }
 				     }
 			     }
+			     
+			    // ------------------------------------------------------------------------
+			    
+			    
+			    /**
+			     *	Set the field group data property.
+			     */
+			     private function set_field_group_data()
+			     {
+
+				     $query = ee()->db
+					 				->select('channel_fields.field_id,channel_fields.field_name,field_groups.group_id,field_groups.site_id,field_groups.group_name')
+					     			->join('field_groups','field_groups.group_id=channel_fields.group_id')
+					     			->where('channel_fields.field_name',$this->field_name)
+					     			->limit(1)
+					     			->get('channel_fields');
+					     			
+					     if($query->num_rows()==1)
+					     {
+						     $row = $query->row_array();
+						     
+						     foreach($row as $key=>$row)
+						     {
+						     	$this->{$key} = $row;
+
+						     }
+						     
+					     }
+
+			     }
+			     
+			     // ------------------------------------------------------------------------
+			     
+			     /** 
+			      * Set custom fields.
+			      */
+			      private function set_custom_fields()
+			      {
+					  	if($this->group_id)
+					  	{
+					  	
+					  	    $select[]	= "CONCAT('field_id_',field_id) AS field_id";
+					  	    $select[]	= "field_name"; 
+					  	    $query = ee()->db
+					  	    			->select($select)
+					  	    			->where('group_id',$this->group_id)
+					  	    			->order_by('field_order','ASC')
+					  	    			->get('channel_fields');
+
+					  	    			foreach($query->result() as $key=>$row)
+					  	    			{
+					  	    				$this->custom_fields[$row->field_name] = $row->field_id;
+					  	    			}
+					  	
+					  	}
+				      
+			      }
 			
 
 			/**
@@ -272,7 +349,7 @@
 						{item}
 					{/exp:gdtlists:items_array}
 					
-					{exp:gdtlists:items_grouped field_name="custom_field_name" sort="desc"} - Returns a list distinct items from the the data for a custom field.
+					{exp:gdtlists:items_grouped field_name="custom_field_name" sort="desc" custom_field="some value"} - Returns a list distinct items from the the data for a custom field.
 					
 					Example:
 					{exp:gdtlists:items_array field_name="awardee_years" sort="desc" channel_name="awardee-database"}
@@ -293,9 +370,10 @@
 					OPTIONAL PARAMETERS: 
 					----------------------------------------------------------------------------
 					channel_name	-	limit results to a channel by name
-					channel_id		-	limit results to a channel by id
-					line_break		-	html, if any, to use as the after each item. Default is <br />
-					sort			-	sort by value of a grouped items tag pair. Default is ASC
+					channel_id	-	limit results to a channel by id
+					line_break	-	html, if any, to use as the after each item. Default is <br />
+					sort		-	sort by value of a grouped items tag pair. Default is ASC
+					custom_field	-	limit grouped_items to results with a custom field of a given value.
 					
 					
 
