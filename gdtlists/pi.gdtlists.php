@@ -45,7 +45,7 @@
 
 	$plugin_info = array(
 	    'pi_name'         => 'Good at Lists',
-	    'pi_version'      => '1.0',
+	    'pi_version'      => '1.1',
 	    'pi_author'       => 'Richard Whitmer/Godat Design, Inc.',
 	    'pi_author_url'   => 'http://godatdesign.com/',
 	    'pi_description'  => '
@@ -62,11 +62,11 @@
 			public	$channel_id			= FALSE;
 			public	$return_data		= '';
 			public	$field_name			= '';
-			public	$field_id			= '';
+			public	$field_id				= '';
 			public	$field_list_items	= '';
 			public	$items_array		= array();
 			public	$line_break			= "<br />\n";
-			public	$sort				= 'ASC';
+			public	$sort						= 'ASC';
 			public	$custom_fields		= array();
 			
 		
@@ -88,9 +88,6 @@
 				{
 				    $this->field_name	= ee()->TMPL->fetch_param('field_name');
 				    $this->set_field_list_items();
-				    
-				    
-				    
 				}
 				
 				if(ee()->TMPL->fetch_param('line_break'))
@@ -109,7 +106,7 @@
 				}
 				
 				
-				
+				$this->array_sort	= ee()->TMPL->fetch_param('array_sort','string');
 				
 			}
 			
@@ -178,7 +175,7 @@
 				  	$this->set_field_group_data();
 				    $this->set_custom_fields();
 				    
-					$data['item']		= array();
+						$data['item']		= array();
 				  	$col 				= $this->field_id();
 				  	$where[$col." !="]	= '';	
 				  	
@@ -193,7 +190,7 @@
 				  	
 				  	if($this->channel_id !== FALSE)
 				  	{
-					  $where['channel_id']	= $this->channel_id;	
+					  	$where['channel_id']	= $this->channel_id;	
 				  	}
 				  	
 
@@ -204,26 +201,38 @@
 				   				->order_by($col,$this->sort)
 				   				->get('channel_data');
 				   				
-				   	
+				   	$rows = $query->result();		
+	
 				   	if($query->num_rows()>0)
 				   	{
-					   	foreach($query->result() as $row)
+				   	
+					   	foreach($rows as $key => $row)
 					   	{
-						   	$data['item'][] = array('item'=>htmlentities($row->{$col}));	
-						}
+						   	$sorted[$key] = $row->{$col};
+
+					   	}
+					   	
+					   	$sorted = $this->array_sorting($sorted);
+
+					   	foreach($sorted as $key=>$row)
+					   	{
+						   	$data['item'][] = array('item'=>htmlentities($row));	
+							}
 				   	
 				   	} else {
 					
-						$data['item'][] = array('item'=>'');   	
+							//$data['item'][] = array('item'=>'');   	
 				   	
 				   	}
-				   	
-				   	
 
 				   	return ee()->TMPL->parse_variables(ee()->TMPL->tagdata,$data['item']);
 			   }	
 			   
 			   // ------------------------------------------------------------------------
+			   
+			   
+			   
+
 			   
 			   
 			   /** Get the channel data field_id of a column name based on the field_name.
@@ -325,6 +334,45 @@
 					  	}
 				      
 			      }
+			    
+			    // ------------------------------------------------------------------------
+			      
+					/**
+			    *	Handle sorting of arrays.
+			    * @param $data array
+			    *	@return array
+			    */
+			    private function array_sorting($data = array())
+			    {
+				  		foreach($data as $key => $row)
+					   	{
+						   	
+						   	if($this->array_sort == 'numeric')
+						   	{
+							   	arsort($data,SORT_NUMERIC);
+							   	
+							   	if($this->sort == 'ASC')
+							   	{
+								   	$data = array_reverse($data);
+							   	}
+						   	
+						   	} else {
+							   	
+							   	arsort($data,SORT_STRING);
+							   	
+							   	if($this->sort == 'ASC')
+							   	{
+								   	$data = array_reverse($data);
+							   	}
+						   	}
+						   	
+					   	}  
+					   	
+					   	return $data;
+				    
+			    }
+			    
+			    // ------------------------------------------------------------------------
 			
 
 			/**
@@ -384,8 +432,17 @@
 					return $buffer;
 					
 			}
-		
-		
 	}
+	
+	
+	// ------------------------------------------------------------------------
+	
+	/** Changelog
+	 *	1.1 - Added array sorting for items_grouped method.
+	 *
+	 */
+	
+
+	
 /* End of file pi.gdtlists.php */
 /* Location: ./system/expressionengine/third_party/gdtlists/pi.gdtlists.php */
