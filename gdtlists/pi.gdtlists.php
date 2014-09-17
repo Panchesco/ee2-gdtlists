@@ -45,7 +45,7 @@
 
 	$plugin_info = array(
 	    'pi_name'         => 'Good at Lists',
-	    'pi_version'      => '1.1',
+	    'pi_version'      => '1.2',
 	    'pi_author'       => 'Richard Whitmer/Godat Design, Inc.',
 	    'pi_author_url'   => 'http://godatdesign.com/',
 	    'pi_description'  => '
@@ -67,7 +67,9 @@
 			public	$items_array		= array();
 			public	$line_break			= "<br />\n";
 			public	$sort						= 'ASC';
-			public	$custom_fields		= array();
+			public	$custom_fields	= array();
+			public	$field_type 			= '';
+			public	$channel_data_col	= '';
 			
 		
 			public function __construct()
@@ -87,7 +89,7 @@
 				if(ee()->TMPL->fetch_param('field_name'))
 				{
 				    $this->field_name	= ee()->TMPL->fetch_param('field_name');
-				    $this->set_field_list_items();
+				    $this->set_field_data();
 				}
 				
 				if(ee()->TMPL->fetch_param('line_break'))
@@ -110,23 +112,31 @@
 				
 			}
 			
+
+			
+
 			// ------------------------------------------------------------------------
 			
 			/**
-			 *	Fetch the field list items values from the channel_fields table.
+			 *	Set some data about field_type and field list items.
 			 *	@return array
 			 */
-			 public function set_field_list_items()
+			 public function set_field_data()
 			 {
+				 $select	= array('field_id','field_type','field_list_items');
+				 
 				 $query = ee()->db
-				 			->select('field_list_items')
+				 			->select($select)
 				 			->where('field_name',$this->field_name)
 				 			->limit(1)
 				 			->get('channel_fields');
 				 
 				 if($query->num_rows()==1)
 				 {
-					 $this->field_list_items = $query->row()->field_list_items;
+					 $row 										= $query->row();
+					 $this->field_type				= $row->field_type;
+					 $this->field_list_items	=	$row->field_list_items;
+					 $this->channel_data_col	= 'field_id_' . $row->field_id;
 				 }			
 			 }
 			 
@@ -193,6 +203,16 @@
 					  	$where['channel_id']	= $this->channel_id;	
 				  	}
 				  	
+				  	
+				  	
+				  	// If this is a multi_select type, get the grouped values from the multi_selects() method.
+				  	if(in_array($this->field_type,array('checkboxes','multi_select')))
+				  	{
+					  	
+					  	$sorted = $this->multi_selects();
+					  	
+				  	} else {
+				  	
 
 				  	$query	= ee()->db
 				   				->select($col)
@@ -205,12 +225,17 @@
 	
 				   	if($query->num_rows()>0)
 				   	{
-				   	
-					   	foreach($rows as $key => $row)
-					   	{
-						   	$sorted[$key] = $row->{$col};
 
-					   	}
+						   	foreach($rows as $key => $row)
+						   	{
+							   	$sorted[$key] = $row->{$col};
+	
+						   	}
+						   	
+						}
+						
+						}
+					   	
 					   	
 					   	$sorted = $this->array_sorting($sorted);
 
@@ -219,11 +244,9 @@
 						   	$data['item'][] = array('item'=>htmlentities($row));	
 							}
 				   	
-				   	} else {
-					
-							//$data['item'][] = array('item'=>'');   	
+				   
 				   	
-				   	}
+				   	
 
 				   	return ee()->TMPL->parse_variables(ee()->TMPL->tagdata,$data['item']);
 			   }	
@@ -231,28 +254,12 @@
 			   // ------------------------------------------------------------------------
 			   
 			   
-			   
-
-			   
-			   
 			   /** Get the channel data field_id of a column name based on the field_name.
 			    *	@return string
 			    */
 			    public function field_id()
 			    {
-				    
-				    $query = ee()->db
-				    			->select('field_id')
-				    			->limit(1)
-				    			->where('field_name',$this->field_name)
-				    			->get('channel_fields');
-				    			
-				    if($query->num_rows()==1)
-				    {
-					    return 'field_id_' . $query->row()->field_id;
-				    } else {
-					    return NULL;
-				    }
+			    	return $this->channel_data_col;
 			    }
 			    
 			    // ------------------------------------------------------------------------
@@ -373,6 +380,66 @@
 			    }
 			    
 			    // ------------------------------------------------------------------------
+			    
+			    
+			    
+			    /**
+			     * Get the field type.
+			     * @return string
+			     */
+			     public function field_type()
+			     {
+
+				     	return $this->field_type;
+				     
+			     }
+			    
+			    
+			    
+			    // ------------------------------------------------------------------------
+			    
+			    
+			/**
+			 *	EE stores multiple select type fields such as checkboxes & multi_select fields
+			 *	as pipe dilimited strings. This function returns those values as a unique array.
+			 *	@return array();
+			 */
+			private function multi_selects()
+			{
+
+					$data		= array();
+					
+					$query	= ee()->db
+											->select($this->channel_data_col)
+											->where('channel_id',$this->channel_id)
+											->get('channel_data');
+											
+					if($query->num_rows()>0)
+					{
+						
+							$rows	= $query->result();
+							
+							foreach($rows as $key=>$row)
+							{
+									$row = trim($row->{$this->channel_data_col});
+									
+									if( ! empty($row))
+									{
+										$vals = explode('|',$row);
+										$data = array_merge($vals,$data);
+									}
+							}
+						
+					}
+					
+					$data		= array_unique($data);
+					
+				return $data;
+				
+			}
+			
+
+			// ------------------------------------------------------------------------
 			
 
 			/**
@@ -439,6 +506,7 @@
 	
 	/** Changelog
 	 *	1.1 - Added array sorting for items_grouped method.
+	 *	1.2 - Handling of grouped items pulled from checkboxes and multi_selects
 	 *
 	 */
 	
