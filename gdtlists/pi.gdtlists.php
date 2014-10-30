@@ -45,7 +45,7 @@
 
 	$plugin_info = array(
 	    'pi_name'         => 'Good at Lists',
-	    'pi_version'      => '1.2',
+	    'pi_version'      => '1.3',
 	    'pi_author'       => 'Richard Whitmer/Godat Design, Inc.',
 	    'pi_author_url'   => 'http://godatdesign.com/',
 	    'pi_description'  => '
@@ -60,6 +60,7 @@
 		
 			public	$channel_name		= '';
 			public	$channel_id			= FALSE;
+			public	$group_id				= FALSE;
 			public	$return_data		= '';
 			public	$field_name			= '';
 			public	$field_id				= '';
@@ -69,7 +70,20 @@
 			public	$sort						= 'ASC';
 			public	$custom_fields	= array();
 			public	$field_type 			= '';
-			public	$channel_data_col	= '';
+			public	$channel_data_col	= FALSE;
+			public	$channel_titles_col	= FALSE;
+			public	$title_fields			= array('entry_id',
+																				'site_id',
+																				'channel_id',
+																				'author_id',
+																				'title',
+																				'url_title',
+																				'entry_date',
+																				'year',
+																				'month',
+																				'day',
+																				'status');
+
 			
 		
 			public function __construct()
@@ -79,13 +93,17 @@
 				{
 				    $this->channel_name	= ee()->TMPL->fetch_param('channel_name');
 				    $this->set_channel_id();
+
 				}
+				
 			
 				if(ee()->TMPL->fetch_param('channel_id'))
 				{
 				    $this->channel_id	= ee()->TMPL->fetch_param('channel_id');
 				}
-			
+				
+				//$this->set_field_group_data();
+							
 				if(ee()->TMPL->fetch_param('field_name'))
 				{
 				    $this->field_name	= ee()->TMPL->fetch_param('field_name');
@@ -123,20 +141,35 @@
 			 */
 			 public function set_field_data()
 			 {
-				 $select	= array('field_id','field_type','field_list_items');
 				 
-				 $query = ee()->db
-				 			->select($select)
-				 			->where('field_name',$this->field_name)
-				 			->limit(1)
-				 			->get('channel_fields');
-				 
-				 if($query->num_rows()==1)
+				 if(in_array($this->field_name,$this->title_fields))
 				 {
-					 $row 										= $query->row();
-					 $this->field_type				= $row->field_type;
-					 $this->field_list_items	=	$row->field_list_items;
-					 $this->channel_data_col	= 'field_id_' . $row->field_id;
+					 
+					 $this->field_type				= 'text';
+					 $this->field_list_items	= '';
+					 $this->channel_data_col	= FALSE;
+					 $this->channel_titles_col	= $this->field_name;
+					 
+					 
+				 } else {
+				 
+					 $select	= array('field_id','field_type','field_list_items');
+					 
+					 $query = ee()->db
+					 			->select($select)
+					 			->where('field_name',$this->field_name)
+					 			->limit(1)
+					 			->get('channel_fields');
+					 
+					 if($query->num_rows()==1)
+					 {
+						 $row 										= $query->row();
+						 $this->field_type				= $row->field_type;
+						 $this->field_list_items	=	$row->field_list_items;
+						 $this->channel_data_col	= 'field_id_' . $row->field_id;
+						 $this->channel_titles_col= FALSE;
+					 }
+				 
 				 }			
 			 }
 			 
@@ -182,73 +215,118 @@
 			   */
 			   public function items_grouped()
 			   {
-				  	$this->set_field_group_data();
-				    $this->set_custom_fields();
-				    
-						$data['item']		= array();
-				  	$col 				= $this->field_id();
-				  	$where[$col." !="]	= '';	
-				  	
-				  	
-				  	foreach($this->custom_fields as $key => $row)
-				  	{
-					  	if(ee()->TMPL->fetch_param($key))
-					  	{
-						  	$where[$row]	= ee()->TMPL->fetch_param($key);
-					  	}
-				  	}
-				  	
-				  	if($this->channel_id !== FALSE)
-				  	{
-					  	$where['channel_id']	= $this->channel_id;	
-				  	}
-				  	
-				  	
-				  	
-				  	// If this is a multi_select type, get the grouped values from the multi_selects() method.
-				  	if(in_array($this->field_type,array('checkboxes','multi_select')))
-				  	{
-					  	
-					  	$sorted = $this->multi_selects();
-					  	
-				  	} else {
-				  	
+			   
+			   				$sorted = array();
+			   
+			   				$this->set_field_group_data();
+						    $this->set_custom_fields();
 
-				  	$query	= ee()->db
-				   				->select($col)
-				   				->where($where)
-				   				->group_by($col)
-				   				->order_by($col,$this->sort)
-				   				->get('channel_data');
-				   				
-				   	$rows = $query->result();		
-	
-				   	if($query->num_rows()>0)
-				   	{
+						  	
+						  	if($this->channel_data_col!==FALSE)
+						  	{	
+						  		$col 				=	$this->channel_data_col;
+						  		
+							  	
+						  		$sel[]		= 'channel_data.'.$col;
+						  		$where['channel_data.'.$col." !="]	= '';	
+						  		$group_by	= 'channel_data.'.$col;
+						  		$orderby	= 'channel_data.'.$col;
+						  	
+						  	} else {
+							  	
+							  	$col	= $this->channel_titles_col;
+							  	
+							  	if($col=='')
+							  	{
+								  	return $col;
+							  	}
+							  	
+							  	$sel[]		= 'channel_titles.'.$col;
+							  	$where['channel_titles.'.$col." !="]	= '';	
+							  	$group_by	= 'channel_titles.'.$col;
+							  	$orderby	= 'channel_titles.'.$col;
+						  	
+						  	}
+						  	
+						  	
+						  	foreach($this->title_fields as $key => $row)
+						  	{
+							  	if(ee()->TMPL->fetch_param($row))
+							  	{
+								  	$where['channel_titles.'.$row]	= ee()->TMPL->fetch_param($row);
+							  	}
+						  	}		
+						  	
 
-						   	foreach($rows as $key => $row)
-						   	{
-							   	$sorted[$key] = $row->{$col};
-	
-						   	}
+						  	
+						  	foreach($this->custom_fields as $key => $row)
+						  	{
+							  	if(ee()->TMPL->fetch_param($key))
+							  	{
+								  	$where['channel_data.'.$row]	= ee()->TMPL->fetch_param($key);
+							  	}
+						  	}
+						  	
+						  	if($this->channel_id !== FALSE)
+						  	{
+							  	$where['channel_data.channel_id']	= $this->channel_id;	
+						  	}
+						  	
+						  	
+						  	
+						  	// If this is a multi_select type, get the grouped values from the multi_selects() method.
+						  	if(in_array($this->field_type,array('checkboxes','multi_select')))
+						  	{
+							  	
+							  	$sorted = $this->multi_selects();
+							  	
+						  	} else {
+						  	
+						  	
+						  	foreach($this->title_fields as $key=>$field)
+						  	{	
+						  	
+						  		$sel[]	= 'channel_titles.'.$field;
+						  	
+						  	}
+						  	
+
+						  	$query	= ee()->db
+						   				->select($sel)
+						   				->join('channel_titles','channel_titles.entry_id=channel_data.entry_id')
+						   				->where($where)
+						   				->group_by($group_by)
+						   				->order_by($orderby,$this->sort)
+						   				->get('channel_data');
+						   				
+						   	$rows = $query->result();	
 						   	
-						}
+
+						   	if($query->num_rows()>0)
+						   	{
+		
+								   	foreach($rows as $key => $row)
+								   	{
+									   	$sorted[$key] = $row->{$col};
+								   	}
+								   	
+								}
+								
 						
-						}
+			
 					   	
 					   	
-					   	$sorted = $this->array_sorting($sorted);
+					   $sorted = $this->array_sorting($sorted);
+					   	
 
-					   	foreach($sorted as $key=>$row)
-					   	{
-						   	$data['item'][] = array('item'=>htmlentities($row));	
+						 	
+						   	foreach($sorted as $key=>$row)
+						   	{
+							   	$data[]['item'] = htmlentities($row);	
+								}
+					   	
+								return ee()->TMPL->parse_variables(ee()->TMPL->tagdata,$data);
 							}
-				   	
-				   
-				   	
-				   	
-
-				   	return ee()->TMPL->parse_variables(ee()->TMPL->tagdata,$data['item']);
 			   }	
 			   
 			   // ------------------------------------------------------------------------
@@ -307,7 +385,8 @@
 						     
 						     foreach($row as $key=>$row)
 						     {
-						     	$this->{$key} = $row;
+						     	
+									 $this->{$key} = $row;
 
 						     }
 						     
@@ -505,8 +584,9 @@
 	// ------------------------------------------------------------------------
 	
 	/** Changelog
-	 *	1.1 - Added array sorting for items_grouped method.
-	 *	1.2 - Handling of grouped items pulled from checkboxes and multi_selects
+	 *	1.1	- Added array sorting for items_grouped method.
+	 *	1.2	- Handling of grouped items pulled from checkboxes and multi_selects.
+	 *	1.3	- Made channel_titles table columns available.
 	 *
 	 */
 	
